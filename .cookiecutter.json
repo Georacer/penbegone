@@ -1,0 +1,12 @@
+{
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "George Zogopoulos",
+  "development_status": "Development Status :: 2 - Pre-Alpha",
+  "email": "tailwhipx4@gmail.com",
+  "friendly_name": "Pen Begone",
+  "github_user": "Georacer",
+  "license": "MIT",
+  "package_name": "penbegone",
+  "project_name": "penbegone",
+  "version": "0.1.0"
+}
