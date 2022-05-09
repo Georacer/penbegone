@@ -6,6 +6,12 @@ on:
       - main
       - master
 
+permissions:
+  actions: write
+  deployments: write
+  id-token: write
+  issues: write
+
 jobs:
   labeler:
     runs-on: ubuntu-latest
