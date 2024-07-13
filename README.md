@@ -9,7 +9,7 @@
 Take your math from the paper to the screen
 
 - **Github repository**: <https://github.com/Georacer/penbegone/>
-- **Documentation** <https://Georacer.github.io/penbegone/>
+- **Documentation** <https://Georacer.github.io/penbegone/> and <https://fpgmaas.github.io/cookiecutter-poetry/>
 
 ## Getting started with your project
 
