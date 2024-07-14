@@ -1,5 +1,9 @@
+import functools
+import operator
+
 import IPython as ip
 import sympy as sp
+from sympy.physics.control import lti
 
 # Conventions
 # A: sympy symbol
@@ -136,22 +140,70 @@ def tf(num, den, var):
         var: The TF variable.
 
     """
-    return sp.physics.control.lti.TransferFunction(num, den, var)
+    return lti.TransferFunction(num, den, var)
 
 
 def series(*args):
-    """Return the series combination of SISO systems."""
-    return sp.physics.control.lti.Series(*args, evaluate=True)
+    """Return the series combination of SISO systems.
+
+    Args:
+        Can be either sympy.physics.control.lti.SISOLinearTimeInvariant or symbol.
+    """
+    if isinstance(args[0], sp.physics.control.lti.SISOLinearTimeInvariant):
+        return lti.Series(*args, evaluate=True)
+    else:
+        return functools.reduce(operator.mul, args, 1)
 
 
 def parallel(*args):
     """Return the parallel combination of SISO systems."""
-    return sp.physics.control.lti.Parallel(*args, evaluate=True)
+    if isinstance(args[0], sp.physics.control.lti.SISOLinearTimeInvariant):
+        return lti.Parallel(*args, evaluate=True)
+    else:
+        return functools.reduce(operator.add, args, 0)
 
 
-def feedback(sys1, sys2, sign=-1):
+def feedback(sys1, sys2=None, sign=-1):
     """Return the feedback combination of two SISO systems."""
-    return sp.physics.control.lti.Feedback(sys1, sys2, sign).doit(cancel=True)
+    if isinstance(sys1, sp.physics.control.lti.SISOLinearTimeInvariant):
+        if not sys2:
+            sys2 = lti.TransferFunction(1, 1, sp.symbols("s"))
+        return lti.Feedback(sys1, sys2, sign).doit(cancel=True)
+    else:
+        if not sys2:
+            sys2 = 1
+        return sp.simplify(sys1 / (1 - sign * sys1 * sys2))
+
+
+def ilaplace(expr, s, t):
+    """Calculate the inverse Laplace transform of an expression.
+
+    Args:
+        expr: The expression.
+        s: The frequency-domain variable.
+        t: The time-domain variable
+    """
+    return sp.inverse_laplace_transform(expr, s, t)
+
+
+def final_value_time(expr, t):
+    """Find the final value of an expresssion in the time domain.
+
+    Args:
+        expr: The expression
+        t: The time variable.
+    """
+    return sp.limit(expr, t, sp.oo)
+
+
+def final_value_freq(expr, s):
+    """Find the final value of an expresssion in the frequency domain.
+
+    Args:
+        expr: The expression
+        s: The frequency variable.
+    """
+    return sp.limit(s * expr, s, 0)
 
 
 if __name__ == "__main__":  # pragma: no cover
