@@ -1,3 +1,3 @@
-from .penbegone import Equations, linearize, printeq
+from . import common, plotting
 
-__all__ = ["printeq", "Equations", "linearize"]
+__all__ = ["common", "plotting"]

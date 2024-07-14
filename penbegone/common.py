@@ -117,11 +117,41 @@ def linearize(f, x=None, x_0=0):
         x: The variable to linearize for.
         x_0: The linearization point.
 
+    Returns:
+        A symbolic expression.
+
     Employs: https://docs.sympy.org/latest/modules/series/series.html#more-intuitive-series-expansion
     """
     res = sp.series(f, x, x_0, n=2)
     res = res.removeO()  # Drop the remainder terms.
     return res
+
+
+def tf(num, den, var):
+    """Create an LTI system.
+
+    Args:
+        num: Numerator polynomial
+        den: Denominator polynomial
+        var: The TF variable.
+
+    """
+    return sp.physics.control.lti.TransferFunction(num, den, var)
+
+
+def series(*args):
+    """Return the series combination of SISO systems."""
+    return sp.physics.control.lti.Series(*args, evaluate=True)
+
+
+def parallel(*args):
+    """Return the parallel combination of SISO systems."""
+    return sp.physics.control.lti.Parallel(*args, evaluate=True)
+
+
+def feedback(sys1, sys2, sign=-1):
+    """Return the feedback combination of two SISO systems."""
+    return sp.physics.control.lti.Feedback(sys1, sys2, sign).doit(cancel=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
