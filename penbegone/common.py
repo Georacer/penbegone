@@ -75,22 +75,50 @@ class Equations:
     def update(self, key, variable, display=True):
         """Solve an equation for a variable and re-apply it to the whole set.
 
-        Does not delete the equation."""
+        Does not delete the equation.
+        It leaves it with the same key so that `use_eq` will be able to delete it later.
+        """
         old_eqs = dict(self.eqs)
         old_r_values = self.r_values
         solution = sp.solve(old_eqs[key], variable)[0]
         self.eqs = {}
         self.r_values = {}
 
-        old_keys = old_eqs.keys()
-        for old_key in old_keys:
-            if variable in old_eqs[old_key].free_symbols:
-                # This equation involves the variable.
-                r_value = old_r_values[old_key]
-                r_expr = old_eqs[old_key] + r_value
-                self.add(r_value, sp.cancel(r_expr.subs([(variable, solution)])))
+        keys = old_eqs.keys()
+        for old_key in keys:
+            var_in_r_values = variable in old_r_values[old_key].free_symbols
+            var_in_eq = variable in old_eqs[old_key].free_symbols
+            r_value = old_r_values[old_key]
+
+            if old_key == key:
+                # This is the equation we are using.
+
+                # If variable is the whole r_value and not in equation, then we don't need to do anything.
+                if (variable - r_value == 0) and not var_in_eq:
+                    self.r_values[old_key] = r_value
+                    self.eqs[old_key] = old_eqs[old_key]
+                else:  # Otherwise we can update it.
+                    # Substitute directly with the solution.
+                    r_expr = old_eqs[old_key] + r_value
+                    self.r_values[old_key] = r_value
+                    self.eqs[old_key] = sp.cancel(r_expr.subs([(variable, solution)]))
+
+            elif var_in_r_values or var_in_eq:
+                # The variable is involved in this equation.
+
+                if variable == r_value:
+                    # The r_value is the exact variable.
+                    # Replace the r_value with 0...
+                    # and only substitute the equation.
+                    self.add(0, sp.cancel(old_eqs[old_key].subs([(variable, solution)])))
+                else:
+                    # Substitution needs to be done either in the r_value and/or in the equation.
+                    new_r_value = r_value.subs(variable, solution) if var_in_r_values else r_value
+                    new_eq = old_eqs[old_key] + new_r_value
+                    self.add(new_r_value, sp.cancel(new_eq.subs([(variable, solution)])))
             else:
-                # This is an unrelated equation, ignore it.
+                # The variable isn't involved in this equation.
+                # Copy as-is.
                 self.eqs[old_key] = old_eqs[old_key]
                 self.r_values[old_key] = old_r_values[old_key]
         self.values[variable] = solution
@@ -105,28 +133,13 @@ class Equations:
         This also deletes this equation from the set, to avoid using it again.
         (The selected equation will be substituted by a 0 expression).
         """
-        old_eqs = dict(self.eqs)
-        old_r_values = self.r_values
-        solution = sp.solve(old_eqs[key], variable)[0]
-        self.eqs = {}
-        self.r_values = {}
 
-        del old_eqs[key]
-        keys = old_eqs.keys()
-        for old_key in keys:
-            if variable in old_eqs[old_key].free_symbols:
-                # If this is a newly substituted equation
-                r_value = old_r_values[old_key]
-                if variable == r_value:
-                    # The r_value is about to be substituted
-                    self.add(0, sp.cancel(old_eqs[old_key].subs([(variable, solution)])))
-                else:
-                    r_expr = old_eqs[old_key] + r_value
-                    self.add(r_value, sp.cancel(r_expr.subs([(variable, solution)])))
-            else:
-                self.eqs[old_key] = old_eqs[old_key]
-                self.r_values[old_key] = old_r_values[old_key]
-        self.values[variable] = solution
+        # Update the variable.
+        self.update(key, variable, display=False)
+
+        # Delete the equation.
+        del self.r_values[key]
+        del self.eqs[key]
 
         # Print the new equations.
         if display:

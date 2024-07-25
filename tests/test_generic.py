@@ -46,3 +46,20 @@ def test_equations_solve():
     sols = eqs.solve()
     assert sols[x1] + 2 == 0
     assert sols[x2] + 1 == 0
+
+
+def test_equations_update():
+    """Test the equations update() method.
+
+    When r_value == variable, it does nothing."""
+    x1, x2 = sp.symbols("x_1, x_2")
+    eqs = pbg.common.Equations()
+    eqs.add(x1, 2 * x2)
+    eqs.add(x2, x1 + 1)
+    eqs.update(1, x1)
+    assert len(eqs.eqs) == 2
+    assert eqs.r_values[1] - x1 == 0
+    assert eqs.eqs[1] - 2 * x2 == 0
+    assert 2 not in eqs.r_values
+    assert eqs.r_values[3] - x2 == 0
+    assert eqs.eqs[3] - (x2 + 1) == 0
