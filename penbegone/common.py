@@ -23,12 +23,18 @@ def printeq(lht, rht):
         ip.display.display(rht)
 
 
+def printsols(sols):
+    """Print the solutions coming out of a solve() method."""
+    for lhs, rhs in sols.items():
+        printeq(lhs, rhs)
+
+
 class Equations:
     """A system of equations."""
 
     def __init__(self):
         """Class constructor."""
-        self.r_values = {}
+        self.r_values = {}  # Left-hand variable values.
         self.eqs = {}
         self.values = {}
         self._counter = 0
@@ -56,11 +62,48 @@ class Equations:
         """Substitute a variable for its value in the whole equation set."""
         self.values[var] = value
 
-    def use_eq(self, key, variable):
+    def isolate(self, key, variable, display=True):
+        """Isolave an equation for a variable."""
+        self.add(variable, sp.solve(self.eqs[key], variable)[0])
+        del self.r_values[key]
+        del self.eqs[key]
+
+        # Print the new equations.
+        if display:
+            self.show()
+
+    def update(self, key, variable, display=True):
+        """Solve an equation for a variable and re-apply it to the whole set.
+
+        Does not delete the equation."""
+        old_eqs = dict(self.eqs)
+        old_r_values = self.r_values
+        solution = sp.solve(old_eqs[key], variable)[0]
+        self.eqs = {}
+        self.r_values = {}
+
+        old_keys = old_eqs.keys()
+        for old_key in old_keys:
+            if variable in old_eqs[old_key].free_symbols:
+                # This equation involves the variable.
+                r_value = old_r_values[old_key]
+                r_expr = old_eqs[old_key] + r_value
+                self.add(r_value, sp.cancel(r_expr.subs([(variable, solution)])))
+            else:
+                # This is an unrelated equation, ignore it.
+                self.eqs[old_key] = old_eqs[old_key]
+                self.r_values[old_key] = old_r_values[old_key]
+        self.values[variable] = solution
+
+        # Print the new equations.
+        if display:
+            self.show()
+
+    def use_eq(self, key, variable, display=True):
         """Solve an equation for a variable and substitute it in the whole set.
 
         This also deletes this equation from the set, to avoid using it again.
-        (The selected equation will be substituted by an 0 expression).
+        (The selected equation will be substituted by a 0 expression).
         """
         old_eqs = dict(self.eqs)
         old_r_values = self.r_values
@@ -85,6 +128,10 @@ class Equations:
                 self.r_values[old_key] = old_r_values[old_key]
         self.values[variable] = solution
 
+        # Print the new equations.
+        if display:
+            self.show()
+
     def apply(self, variable, expression):
         """Equivalent of adding an equation and calling use_eq on it."""
         self._add(variable, expression, silent=True)
@@ -108,9 +155,12 @@ class Equations:
 
         self._last_shown = sorted_keys[-1]
 
-    def solve(self, variables):
+    def solve(self, variables=None):
         """Attempt to solve the equation system automatically."""
-        return sp.solve(self.eqs.values(), variables, check=False, warning=True)
+        if not variables:
+            variables = list(self.r_values.values())
+        sols = sp.solve(self.eqs.values(), variables, check=False, warning=True)
+        return {k: sp.simplify(v) for k, v in sols.items()}
 
 
 def linearize(f, x=None, x_0=0):

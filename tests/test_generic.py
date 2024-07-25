@@ -35,3 +35,14 @@ def test_unit_feedback_tf():
     G = lti.TransferFunction(1, s, s)
     H_ = pbg.common.feedback(G)
     assert H_.to_expr() - 1 / (s + 1) == 0
+
+
+def test_equations_solve():
+    """Test the equations solve() method."""
+    x1, x2 = sp.symbols("x_1, x_2")
+    eqs = pbg.common.Equations()
+    eqs.add(x1, 2 * x2)
+    eqs.add(x2, x1 + 1)
+    sols = eqs.solve()
+    assert sols[x1] + 2 == 0
+    assert sols[x2] + 1 == 0
