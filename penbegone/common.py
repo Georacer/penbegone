@@ -34,15 +34,30 @@ class Equations:
 
     def __init__(self):
         """Class constructor."""
-        self.r_values = {}  # Left-hand variable values.
-        self.eqs = {}
-        self.values = {}
-        self._counter = 0
+        self.lht = {}  # Left-hand equation terms. For display purposes only.
+        self.rht = {}  # Right-hand equation terms. For display purposes only.
+        self.eqs = {}  # The equations still being used to solve the system.
+        self.solutions = {}  # Dictionary with solutions, as variable:value entries.
+        self.solutions_updated = {}  # Dictionary with self.solutions.keys() and a bool on whether it's been printed.
+        self._counter = 0  # The number of the last-created equation.
         self._last_shown = 0
 
     def __getitem__(self, key):
         """Return an equation from the set."""
         return self.eqs[key]
+
+    def __contains__(self, key):
+        """Tell if an equation key is found in this set."""
+        return key in self.eqs
+
+    def __delitem__(self, key):
+        """Delete an equation."""
+        del self.lht[key]
+        del self.eqs[key]
+
+    def __len__(self):
+        """Tell how many equations are contained."""
+        return len(self.eqs) + len(self.solutions)
 
     def add(self, left, right):
         """Add an equation to the system."""
@@ -55,91 +70,71 @@ class Equations:
         else:
             key = self._counter + 1
             self._counter += 1
+        self.lht[key] = left
+        self.rht[key] = right
         self.eqs[key] = -left + right
-        self.r_values[key] = left
 
-    def set_value(self, var, value):
-        """Substitute a variable for its value in the whole equation set."""
-        self.values[var] = value
+    def rearrange(self, key, variable, display=True, inplace=False):
+        """Rearrange an equation for a variable.
 
-    def isolate(self, key, variable, display=True):
-        """Isolave an equation for a variable."""
-        self.add(variable, sp.solve(self.eqs[key], variable)[0])
-        del self.r_values[key]
-        del self.eqs[key]
+        Perhaps it works for rearranging for an expression as well?"""
+        solution = sp.solve(self.eqs[key], variable)[0]
 
-        # Print the new equations.
-        if display:
-            self.show()
-
-    def update(self, key, variable, display=True):
-        """Solve an equation for a variable and re-apply it to the whole set.
-
-        Does not delete the equation.
-        It leaves it with the same key so that `use_eq` will be able to delete it later.
-        """
-        old_eqs = dict(self.eqs)
-        old_r_values = self.r_values
-        solution = sp.solve(old_eqs[key], variable)[0]
-        self.eqs = {}
-        self.r_values = {}
-
-        keys = old_eqs.keys()
-        for old_key in keys:
-            var_in_r_values = variable in old_r_values[old_key].free_symbols
-            var_in_eq = variable in old_eqs[old_key].free_symbols
-            r_value = old_r_values[old_key]
-
-            if old_key == key:
-                # This is the equation we are using.
-
-                # If variable is the whole r_value and not in equation, then we don't need to do anything.
-                if (variable - r_value == 0) and not var_in_eq:
-                    self.r_values[old_key] = r_value
-                    self.eqs[old_key] = old_eqs[old_key]
-                else:  # Otherwise we can update it.
-                    # Substitute directly with the solution.
-                    r_expr = old_eqs[old_key] + r_value
-                    self.r_values[old_key] = r_value
-                    self.eqs[old_key] = sp.cancel(r_expr.subs([(variable, solution)]))
-
-            elif var_in_r_values or var_in_eq:
-                # The variable is involved in this equation.
-
-                if variable == r_value:
-                    # The r_value is the exact variable.
-                    # Replace the r_value with 0...
-                    # and only substitute the equation.
-                    self.add(0, sp.cancel(old_eqs[old_key].subs([(variable, solution)])))
-                else:
-                    # Substitution needs to be done either in the r_value and/or in the equation.
-                    new_r_value = r_value.subs(variable, solution) if var_in_r_values else r_value
-                    new_eq = old_eqs[old_key] + new_r_value
-                    self.add(new_r_value, sp.cancel(new_eq.subs([(variable, solution)])))
-            else:
-                # The variable isn't involved in this equation.
-                # Copy as-is.
-                self.eqs[old_key] = old_eqs[old_key]
-                self.r_values[old_key] = old_r_values[old_key]
-        self.values[variable] = solution
+        if inplace:
+            self.lht[key] = variable
+            self.rht[key] = solution
+            self.eqs[key] = -variable + solution
+        else:
+            self.add(variable, solution)
+            del self[key]
 
         # Print the new equations.
         if display:
             self.show()
 
     def use_eq(self, key, variable, display=True):
-        """Solve an equation for a variable and substitute it in the whole set.
+        """Solve an equation for a variable.
 
-        This also deletes this equation from the set, to avoid using it again.
-        (The selected equation will be substituted by a 0 expression).
-        """
+        Removes the equation and adds the variable to the solutions dictionary."""
 
-        # Update the variable.
-        self.update(key, variable, display=False)
+        # Solve the equation for the variable.
+        self.rearrange(key, variable, inplace=True, display=False)
 
-        # Delete the equation.
-        del self.r_values[key]
-        del self.eqs[key]
+        # Add the entry to the solutions attribute.
+        self.solutions[variable] = self.rht[key]
+        self.solutions_updated[variable] = True
+
+        # Remove the equation.
+        del self[key]
+
+        # Update all involved equations with the new solutions entry.
+        old_keys = list(self.eqs.keys())
+        for old_key in old_keys:
+            lht = self.lht[old_key]
+            rht = self.rht[old_key]
+            eq = self.eqs[old_key]
+
+            if variable in self.eqs[old_key].free_symbols:
+                eq = sp.simplify(eq.subs(variable, self.solutions[variable]))
+
+                if variable in lht.free_symbols:
+                    lht = sp.simplify(lht.subs(variable, self.solutions[variable]))
+
+                if variable in rht.free_symbols:
+                    rht = sp.simplify(rht.subs(variable, self.solutions[variable]))
+
+                del self[old_key]
+                self.add(lht, rht)
+
+        # Update all involved solutions with the new solutions entry.
+        for k, v in self.solutions.items():
+            if (
+                (k - variable != 0)  # This solution is not the one we just added.
+                and (variable in v.free_symbols)  # The variable is involved in this solution;
+                # It is worth substituting.
+            ):
+                self.solutions[k] = v.subs(variable, self.solutions[variable])
+                self.solutions_updated[k] = False
 
         # Print the new equations.
         if display:
@@ -153,17 +148,26 @@ class Equations:
     def show(self, show_all=False):
         """Show the whole equation set.
 
-        By default will show only equations not previously shown.
+        By default will show only equations and solutions not previously shown.
 
         Args:
             show_all: Show all the equations of the set.
         """
+        # First show the solutions so far.
+        variables = self.solutions_updated.keys()
+        for var in variables:
+            if self.solutions_updated[var] or show_all:
+                string = ip.display.Markdown(f"${sp.printing.latex(var)}$ = ${sp.printing.latex(self.solutions[var])}$")
+                ip.display.display(string)
+                self.solutions_updated[var] = False
+
+        # Next show the equations.
         sorted_keys = sorted(self.eqs.keys())
         for key in sorted_keys:
             if key > self._last_shown or show_all:
-                r_value = self.r_values[key]
-                expr = sp.simplify(self.eqs[key] + r_value)
-                string = ip.display.Markdown(f"[{key}]: ${sp.printing.latex(r_value)}$ = ${sp.printing.latex(expr)}$")
+                string = ip.display.Markdown(
+                    f"[{key}]: ${sp.printing.latex(self.lht[key])}$ = ${sp.printing.latex(self.rht[key])}$"
+                )
                 ip.display.display(string)
 
         self._last_shown = sorted_keys[-1]
@@ -171,7 +175,7 @@ class Equations:
     def solve(self, variables=None):
         """Attempt to solve the equation system automatically."""
         if not variables:
-            variables = list(self.r_values.values())
+            variables = list(self.lht.values())
         sols = sp.solve(self.eqs.values(), variables, check=False, warning=True)
         return {k: sp.simplify(v) for k, v in sols.items()}
 

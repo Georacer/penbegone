@@ -48,18 +48,37 @@ def test_equations_solve():
     assert sols[x2] + 1 == 0
 
 
-def test_equations_update():
-    """Test the equations update() method.
+def test_equations_rearrange():
+    """Test the equations rearrange() method.
+
+    When r_value == variable, it does nothing."""
+    x1, x2 = sp.symbols("x_1, x_2")
+    eqs = pbg.common.Equations()
+    eqs.add(3 * x2 - x1, x1)
+    eqs.add(x2, x1 + 1)
+    eqs.rearrange(1, x1)  # Called with inplace = False
+    assert len(eqs.eqs) == 2  # There are still two equations.
+    assert eqs._counter == 3  # A new equation has been created.
+    assert 1 not in eqs  # The old one has been deleted.
+    assert eqs.lht[2] - x2 == 0
+    assert eqs.rht[2] - x1 - 1 == 0
+    assert eqs.lht[3] - x1 == 0
+    assert eqs.rht[3] - (3 / 2 * x2) == 0
+
+
+def test_equations_use_eq():
+    """Test the equations use_eq() method.
 
     When r_value == variable, it does nothing."""
     x1, x2 = sp.symbols("x_1, x_2")
     eqs = pbg.common.Equations()
     eqs.add(x1, 2 * x2)
     eqs.add(x2, x1 + 1)
-    eqs.update(1, x1)
-    assert len(eqs.eqs) == 2
-    assert eqs.r_values[1] - x1 == 0
-    assert eqs.eqs[1] - 2 * x2 == 0
-    assert 2 not in eqs.r_values
-    assert eqs.r_values[3] - x2 == 0
-    assert eqs.eqs[3] - (x2 + 1) == 0
+    eqs.use_eq(1, x1)
+    assert len(eqs) == 2  # We should have one equation left and one solution.
+    assert 1 not in eqs
+    assert 2 not in eqs
+    assert 3 in eqs
+    assert eqs.solutions[x1] - 2 * x2 == 0
+    assert eqs.lht[3] - x2 == 0
+    assert eqs.rht[3] - (2 * x2 + 1) == 0
