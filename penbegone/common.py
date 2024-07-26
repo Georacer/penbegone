@@ -13,6 +13,11 @@ from sympy.physics.control import lti
 # Use `display` to print symbols
 
 
+class NoSolutionError(RuntimeError):
+    def __init__(self):
+        super().__init__("Could not find a solution.")
+
+
 def printeq(lht, rht):
     """Print the two parts of an equation in the jupyter output."""
     try:
@@ -115,6 +120,7 @@ class Equations:
             eq = self.eqs[old_key]
 
             if variable in self.eqs[old_key].free_symbols:
+                # This check doesn't work for symbols that are functions.
                 eq = sp.simplify(eq.subs(variable, self.solutions[variable]))
 
                 if variable in lht.free_symbols:
@@ -145,6 +151,24 @@ class Equations:
         self._add(variable, expression, silent=True)
         self.use_eq("temp", variable)
 
+    def apply_solutions(self, key, display=True):
+        """Forcefully apply the solutions onto an equation."""
+        lht = sp.simplify(self.lht[key].subs(self.solutions))
+        rht = sp.simplify(self.rht[key].subs(self.solutions))
+
+        del self[key]
+        self.add(lht, rht)
+
+    def update_solutions(self, var, display=True):
+        """Apply a solution onto the rest."""
+        for v, _ in self.solutions.items():
+            if v - var != 0:
+                self.solutions[v] = sp.simplify(self.solutions[v].subs(var, self.solutions[var]))
+                self.solutions_updated[v] = True
+
+        if display:
+            self.show()
+
     def show(self, show_all=False):
         """Show the whole equation set.
 
@@ -170,13 +194,16 @@ class Equations:
                 )
                 ip.display.display(string)
 
-        self._last_shown = sorted_keys[-1]
+        if sorted_keys:
+            self._last_shown = sorted_keys[-1]
 
     def solve(self, variables=None):
         """Attempt to solve the equation system automatically."""
         if not variables:
             variables = list(self.lht.values())
-        sols = sp.solve(self.eqs.values(), variables, check=False, warning=True)
+        sols = sp.solve(self.eqs.values(), variables, check=False, warning=True, dict=True)
+        if not sols:
+            raise NoSolutionError()
         return {k: sp.simplify(v) for k, v in sols.items()}
 
 
@@ -240,6 +267,17 @@ def feedback(sys1, sys2=None, sign=-1):
         if not sys2:
             sys2 = 1
         return sp.simplify(sys1 / (1 - sign * sys1 * sys2))
+
+
+def laplace(expr, t, s):
+    """Calculate the Laplace transform of an expression.
+
+    Args:
+        expr: The expression.
+        t: The frequency-domain variable.
+        s: The time-domain variable
+    """
+    return sp.laplace_transform(expr, t, s, noconds=True)
 
 
 def ilaplace(expr, s, t):
