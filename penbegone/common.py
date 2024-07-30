@@ -141,7 +141,7 @@ class Equations:
         if display:
             self.show()
 
-    def use_eq(self, key, variable, display=True):
+    def use_eq(self, key, variable, display=True, force=False):
         """Solve an equation for a variable.
 
         Removes the equation and adds the variable to the solutions dictionary."""
@@ -163,14 +163,14 @@ class Equations:
             rht = self.rht[old_key]
             eq = self.eqs[old_key]
 
-            if variable in self.eqs[old_key].free_symbols:
+            if variable in self.eqs[old_key].free_symbols or force:
                 # This check doesn't work for symbols that are functions.
                 eq = sp.simplify(eq.subs(variable, self.solutions[variable]))
 
-                if variable in lht.free_symbols:
+                if variable in lht.free_symbols or force:
                     lht = sp.simplify(lht.subs(variable, self.solutions[variable]))
 
-                if variable in rht.free_symbols:
+                if variable in rht.free_symbols or force:
                     rht = sp.simplify(rht.subs(variable, self.solutions[variable]))
 
                 del self[old_key]
