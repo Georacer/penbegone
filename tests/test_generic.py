@@ -4,6 +4,18 @@ from sympy.physics.control import lti
 import penbegone as pbg
 
 
+def test_find_functions():
+    """Test the find_functions function."""
+    x, y = sp.symbols("x y")
+    f, g = pbg.common.functions("f g", x)
+    h = pbg.common.functions("h", y)
+    expr_ = f + g + h
+    funs = pbg.common.find_functions(expr_, x)
+    assert f.func in funs
+    assert g.func in funs
+    assert h.func not in funs
+
+
 def test_linearization():
     """Test the linearization of a nonlinear function."""
     x = sp.symbols("s")
@@ -11,6 +23,27 @@ def test_linearization():
     f_lin_ = pbg.common.linearize(f_, x, x_0=2)
     f_lin_exp_ = 4 * x - 4
     assert f_lin_ - f_lin_exp_ == 0
+
+
+def test_laplace():
+    """Test the Laplace transform."""
+    s, t, a = sp.symbols("s t a")
+    y_ = sp.exp(-a * t)
+    Y_ = pbg.common.laplace(y_, t, s)
+    Y_exp_ = 1 / (s + a)
+    assert Y_ - Y_exp_ == 0
+
+
+def test_laplace_2():
+    """Test the Laplace transform when using functions."""
+    s, t = sp.symbols("s t")
+    f = pbg.common.functions("f", t)
+    F = pbg.common.functions("F", s)
+    corr = {f.func: F.func}
+    y_ = t * f
+    Y_ = pbg.common.laplace(y_, t, s, corr)
+    Y_exp_ = -F.diff(s)
+    assert Y_ - Y_exp_ == 0
 
 
 def test_ilaplace():

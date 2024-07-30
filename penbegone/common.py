@@ -1,5 +1,7 @@
+import collections
 import functools
 import operator
+from copy import copy
 
 import IPython as ip
 import sympy as sp
@@ -16,6 +18,48 @@ from sympy.physics.control import lti
 class NoSolutionError(RuntimeError):
     def __init__(self):
         super().__init__("Could not find a solution.")
+
+
+def functions(definitions, arg):
+    """Define function variables.
+
+    Args
+    ----
+    definitions : str
+        Same as the argument of sp.symbols(definitions)
+    arg : sp.Symbol
+        The single argument to the function. E.g. x for f(x).
+    """
+    funs = sp.symbols(definitions, cls=sp.Function)
+    if isinstance(funs, collections.abc.Iterable):
+        return (fun(arg) for fun in funs)
+    else:
+        return funs(arg)
+
+
+def find_functions(expr, arg=None):
+    """Find all the functions in an expression.
+
+    Args
+    ----
+    expr
+        A sympy expression.
+    arg : sp.Symbol, optional
+        Return functions of that argument only. E.g. Return f only if f(x).
+
+    Returns
+    -------
+    functions : Iterable
+        The functions found in the expression.
+    """
+
+    if arg:
+        functions = {
+            i.func for i in expr.atoms(sp.Function) if isinstance(i, sp.core.function.AppliedUndef) and i.args == (arg,)
+        }
+    else:
+        functions = {i.func for i in expr.atoms(sp.Function)}
+    return functions
 
 
 def printeq(lht, rht):
@@ -269,15 +313,41 @@ def feedback(sys1, sys2=None, sign=-1):
         return sp.simplify(sys1 / (1 - sign * sys1 * sys2))
 
 
-def laplace(expr, t, s):
+def laplace(expr, t, s, correspondence=None):
     """Calculate the Laplace transform of an expression.
 
-    Args:
-        expr: The expression.
-        t: The frequency-domain variable.
-        s: The time-domain variable
+    Args
+    ----
+    expr
+        The expression.
+    t : sp.Symbol
+        The frequency-domain variable.
+    s : sp.Symbol
+        The time-domain variable
+    correspondence : dict, optional
+        A dictionary to assign time-domain function f to frequency-domain function F.
+        Required when there are functions in expr.
+
     """
-    return sp.laplace_transform(expr, t, s, noconds=True)
+    # Calculate the inverse laplace transform.
+    expr_s_ = sp.laplace_transform(expr, t, s, noconds=True)
+    # Find the functions of t.
+    funcs_t = find_functions(expr_s_, t)
+    if len(funcs_t) > 0:
+        # Replace them with a capital letter.
+        expr_s_ = sp.laplace_correspondence(expr_s_, correspondence)
+    # Set the initial conditions to 0.
+    init_conds = {f: [0] * 5 for f in funcs_t}
+    expr_s_ = sp.laplace_initial_conds(expr_s_, t, init_conds)
+
+    return expr_s_
+
+
+def _upper(symbol):
+    """Return a new symbol with the same name but the first letter is capital."""
+    upper = copy(symbol)
+    upper.name = upper.name.capitalize()
+    return upper
 
 
 def ilaplace(expr, s, t):
