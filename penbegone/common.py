@@ -251,21 +251,31 @@ class Equations:
         return {k: sp.simplify(v) for k, v in sols.items()}
 
 
-def linearize(f, x=None, x_0=0):
+def linearize(f, x=None, x_0=0, local_model=False):
     """Linearize a symbolic expression.
 
-    Args:
-        f: A nonlinear symbolic expression.
-        x: The variable to linearize for.
-        x_0: The linearization point.
+    Args
+    ----
+    f
+        A nonlinear symbolic expression.
+    x
+        The variable to linearize for.
+    x_0
+        The linearization point.
+    local_model : optional
+        If True, return the local model Δy = mΔx
 
-    Returns:
-        A symbolic expression.
+    Returns
+    -------
+    A symbolic expression.
 
     Employs: https://docs.sympy.org/latest/modules/series/series.html#more-intuitive-series-expansion
     """
     res = sp.series(f, x, x_0, n=2)
     res = res.removeO()  # Drop the remainder terms.
+    if local_model:
+        # Replace with the local difference variable.
+        res = res.subs(x, x + x_0) - f.subs(x, x_0)
     return res
 
 

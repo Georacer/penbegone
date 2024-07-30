@@ -18,10 +18,19 @@ def test_find_functions():
 
 def test_linearization():
     """Test the linearization of a nonlinear function."""
-    x = sp.symbols("s")
+    x = sp.symbols("x")
     f_ = x**2
     f_lin_ = pbg.common.linearize(f_, x, x_0=2)
     f_lin_exp_ = 4 * x - 4
+    assert f_lin_ - f_lin_exp_ == 0
+
+
+def test_linearization_2():
+    """Test the linearization of a nonlinear function into a local model"""
+    x, c = sp.symbols("x c")
+    f_ = c * sp.ln(x)
+    f_lin_ = pbg.common.linearize(f_, x, x_0=2, local_model=True)
+    f_lin_exp_ = c / 2 * x
     assert f_lin_ - f_lin_exp_ == 0
 
 
