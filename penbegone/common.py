@@ -32,12 +32,12 @@ def functions(definitions, arg):
     """
     funs = sp.symbols(definitions, cls=sp.Function)
     if isinstance(funs, collections.abc.Iterable):
-        return (fun(arg) for fun in funs)
+        return [fun(arg) for fun in funs]
     else:
-        return funs(arg)
+        return list(funs(arg))
 
 
-def find_functions(expr, arg=None):
+def find_functions(expr, arg=None, pure=True):
     """Find all the functions in an expression.
 
     Args
@@ -46,6 +46,8 @@ def find_functions(expr, arg=None):
         A sympy expression.
     arg : sp.Symbol, optional
         Return functions of that argument only. E.g. Return f only if f(x).
+    pure : bool
+        If True, return only f. If False, return f(arg).
 
     Returns
     -------
@@ -55,10 +57,12 @@ def find_functions(expr, arg=None):
 
     if arg:
         functions = {
-            i.func for i in expr.atoms(sp.Function) if isinstance(i, sp.core.function.AppliedUndef) and i.args == (arg,)
+            i for i in expr.atoms(sp.Function) if isinstance(i, sp.core.function.AppliedUndef) and i.args == (arg,)
         }
     else:
-        functions = {i.func for i in expr.atoms(sp.Function)}
+        functions = set(expr.atoms(sp.Function))
+    if pure:
+        functions = {i.func for i in functions}
     return functions
 
 
@@ -102,6 +106,7 @@ class Equations:
     def __delitem__(self, key):
         """Delete an equation."""
         del self.lht[key]
+        del self.rht[key]
         del self.eqs[key]
 
     def __len__(self):
@@ -160,17 +165,26 @@ class Equations:
         old_keys = list(self.eqs.keys())
         for old_key in old_keys:
             lht = self.lht[old_key]
+            try:
+                do_lht = variable in lht.free_symbols or variable in find_functions(lht, pure=False) or force
+            except AttributeError:  # lht is probably a pure number.
+                do_lht = False
             rht = self.rht[old_key]
+            try:
+                do_rht = variable in rht.free_symbols or variable in find_functions(rht, pure=False) or force
+            except AttributeError:  # rht is probably a pure number.
+                do_lht = False
             eq = self.eqs[old_key]
+            do_eq = variable in eq.free_symbols or variable in find_functions(eq, pure=False) or force
 
-            if variable in self.eqs[old_key].free_symbols or force:
+            if do_eq:
                 # This check doesn't work for symbols that are functions.
                 eq = sp.simplify(eq.subs(variable, self.solutions[variable]))
 
-                if variable in lht.free_symbols or force:
+                if do_lht:
                     lht = sp.simplify(lht.subs(variable, self.solutions[variable]))
 
-                if variable in rht.free_symbols or force:
+                if do_rht:
                     rht = sp.simplify(rht.subs(variable, self.solutions[variable]))
 
                 del self[old_key]
@@ -249,6 +263,38 @@ class Equations:
         if not sols:
             raise NoSolutionError()
         return {k: sp.simplify(v) for k, v in sols.items()}
+
+    def laplace(self, t, s, corr, show=True):
+        """Carry out the Laplace transform to the whole set.
+
+        Args
+        ----
+        t: sp.symbol
+            The variable of time.
+        s: sp.symbol
+            The variable of frequency.
+        corr: dict
+            The correspondence between time and frequency functions. See build_correspondence.
+        """
+
+        # Carry out the transform in all equations.
+        old_keys = list(self.eqs.keys())
+        for old_key in old_keys:
+            new_lht = laplace(self.lht[old_key], t, s, corr)
+            new_rht = laplace(self.rht[old_key], t, s, corr)
+            del self[old_key]
+            self.add(new_lht, new_rht)
+
+        # Carry out the transforms in all solutions.
+        old_vars = self.solutions.keys()
+        for old_var in old_vars:
+            new_var = laplace(old_var, t, s, corr)
+            new_sol = laplace(self.solutions[old_var], t, s, corr)
+            del self.solutions[old_var]
+            self.solutions[new_var] = new_sol
+
+        if show:
+            self.show()
 
 
 def linearize(f, x=None, x_0=0, local_model=False):
@@ -351,6 +397,20 @@ def laplace(expr, t, s, correspondence=None):
     expr_s_ = sp.laplace_initial_conds(expr_s_, t, init_conds)
 
     return expr_s_
+
+
+def build_correspondence(f_time, f_freq):
+    """Build a correspondence dictionary between two iterables.
+
+    Args
+    ----
+    f_time: Iterable
+        The functions in the time domain.
+    f_freq: Iterable
+        The corresponding functions in the frequency domain.
+    """
+
+    return {t.func: f.func for t, f in zip(f_time, f_freq)}
 
 
 def _upper(symbol):
