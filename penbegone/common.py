@@ -34,7 +34,7 @@ def functions(definitions, arg):
     if isinstance(funs, collections.abc.Iterable):
         return [fun(arg) for fun in funs]
     else:
-        return list(funs(arg))
+        return funs(arg)
 
 
 def find_functions(expr, arg=None, pure=True):
@@ -262,7 +262,7 @@ class Equations:
         sols = sp.solve(self.eqs.values(), variables, check=False, warning=True, dict=True)
         if not sols:
             raise NoSolutionError()
-        return {k: sp.simplify(v) for k, v in sols.items()}
+        return {k: sp.simplify(v) for k, v in sols[0].items()}
 
     def laplace(self, t, s, corr, show=True):
         """Carry out the Laplace transform to the whole set.
