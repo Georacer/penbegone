@@ -146,21 +146,7 @@ class Equations:
         if display:
             self.show()
 
-    def use_eq(self, key, variable, display=True, force=False):
-        """Solve an equation for a variable.
-
-        Removes the equation and adds the variable to the solutions dictionary."""
-
-        # Solve the equation for the variable.
-        self.rearrange(key, variable, inplace=True, display=False)
-
-        # Add the entry to the solutions attribute.
-        self.solutions[variable] = self.rht[key]
-        self.solutions_updated[variable] = True
-
-        # Remove the equation.
-        del self[key]
-
+    def _update_eqs(self, variable, force):
         # Update all involved equations with the new solutions entry.
         old_keys = list(self.eqs.keys())
         for old_key in old_keys:
@@ -173,7 +159,7 @@ class Equations:
             try:
                 do_rht = variable in rht.free_symbols or variable in find_functions(rht, pure=False) or force
             except AttributeError:  # rht is probably a pure number.
-                do_lht = False
+                do_rht = False
             eq = self.eqs[old_key]
             do_eq = variable in eq.free_symbols or variable in find_functions(eq, pure=False) or force
 
@@ -190,18 +176,39 @@ class Equations:
                 del self[old_key]
                 self.add(lht, rht)
 
+    def _update_solutions(self, variable, force):
         # Update all involved solutions with the new solutions entry.
         for k, v in self.solutions.items():
             if (
-                (k - variable != 0)  # This solution is not the one we just added.
-                and (variable in v.free_symbols)  # The variable is involved in this solution;
-                # It is worth substituting.
+                k - variable != 0  # This solution is not the one we just added.
+                and (variable in v.free_symbols or variable in find_functions(v, pure=False) or force)
             ):
-                self.solutions[k] = v.subs(variable, self.solutions[variable])
-                self.solutions_updated[k] = False
+                # It is worth substituting.
+                self.solutions[k] = v.subs(variable, self.solutions[variable]).simplify()
+                self.solutions_updated[k] = True
+
+    def use_eq(self, key, variable, display=True, display_all=False, force=False):
+        """Solve an equation for a variable.
+
+        Removes the equation and adds the variable to the solutions dictionary."""
+
+        # Solve the equation for the variable.
+        self.rearrange(key, variable, inplace=True, display=False)
+
+        # Add the entry to the solutions attribute.
+        self.solutions[variable] = self.rht[key]
+        self.solutions_updated[variable] = True
+
+        # Remove the equation.
+        del self[key]
+
+        self._update_eqs(variable, force)
+        self._update_solutions(variable, force)
 
         # Print the new equations.
-        if display:
+        if display_all:
+            self.show(True)
+        elif display:
             self.show()
 
     def apply(self, variable, expression):
@@ -211,6 +218,7 @@ class Equations:
 
     def apply_solutions(self, key, display=True):
         """Forcefully apply the solutions onto an equation."""
+        # Probably subset of _update_equations.
         lht = sp.simplify(self.lht[key].subs(self.solutions))
         rht = sp.simplify(self.rht[key].subs(self.solutions))
 
@@ -264,7 +272,7 @@ class Equations:
             raise NoSolutionError()
         return {k: sp.simplify(v) for k, v in sols[0].items()}
 
-    def laplace(self, t, s, corr, show=True):
+    def laplace(self, t, s, corr, init_conds=None, show=True):
         """Carry out the Laplace transform to the whole set.
 
         Args
@@ -280,16 +288,16 @@ class Equations:
         # Carry out the transform in all equations.
         old_keys = list(self.eqs.keys())
         for old_key in old_keys:
-            new_lht = laplace(self.lht[old_key], t, s, corr)
-            new_rht = laplace(self.rht[old_key], t, s, corr)
+            new_lht = laplace(self.lht[old_key], t, s, corr, init_conds)
+            new_rht = laplace(self.rht[old_key], t, s, corr, init_conds)
             del self[old_key]
             self.add(new_lht, new_rht)
 
         # Carry out the transforms in all solutions.
         old_vars = self.solutions.keys()
         for old_var in old_vars:
-            new_var = laplace(old_var, t, s, corr)
-            new_sol = laplace(self.solutions[old_var], t, s, corr)
+            new_var = laplace(old_var, t, s, corr, init_conds)
+            new_sol = laplace(self.solutions[old_var], t, s, corr, init_conds)
             del self.solutions[old_var]
             self.solutions[new_var] = new_sol
 
@@ -369,7 +377,7 @@ def feedback(sys1, sys2=None, sign=-1):
         return sp.simplify(sys1 / (1 - sign * sys1 * sys2))
 
 
-def laplace(expr, t, s, correspondence=None):
+def laplace(expr, t, s, correspondence=None, init_conds=None):
     """Calculate the Laplace transform of an expression.
 
     Args
@@ -392,11 +400,29 @@ def laplace(expr, t, s, correspondence=None):
     if len(funcs_t) > 0:
         # Replace them with a capital letter.
         expr_s_ = sp.laplace_correspondence(expr_s_, correspondence)
-    # Set the initial conditions to 0.
-    init_conds = {f: [0] * 5 for f in funcs_t}
+    # Set the initial conditions.
+    if not init_conds:
+        init_conds = build_initial_conditions(funcs_t)
     expr_s_ = sp.laplace_initial_conds(expr_s_, t, init_conds)
 
     return expr_s_
+
+
+def build_initial_conditions(f_time, order=5):
+    """Build a dictionary of zero initial conditions.
+
+    Args
+    ----
+    f_time: Iterator
+        A list of function of time, for whom to build zero initial conditions.
+    order: int
+        Up to which order to build initial conditions for.
+
+    Returns
+    -------
+    A dictionary with keys the items of f_time and values the list order*[0].
+    """
+    return {f.func: order * [0] for f in f_time}
 
 
 def build_correspondence(f_time, f_freq):
@@ -449,6 +475,13 @@ def final_value_freq(expr, s):
         s: The frequency variable.
     """
     return sp.limit(s * expr, s, 0)
+
+
+def collect_powers(expr, x):
+    """Re-write an expression as a polynomial of x."""
+    num = sp.numer(expr)
+    den = sp.denom(expr)
+    return num.expand().collect(x) / den.expand().collect(x)
 
 
 if __name__ == "__main__":  # pragma: no cover
