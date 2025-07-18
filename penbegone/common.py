@@ -99,6 +99,10 @@ class Equations:
         """Return an equation from the set."""
         return self.eqs[key]
 
+    def __iter__(self):
+        """Return the equations list."""
+        return iter(self.eqs.values())
+
     def __contains__(self, key):
         """Tell if an equation key is found in this set."""
         return key in self.eqs
@@ -235,6 +239,30 @@ class Equations:
         if display:
             self.show()
 
+    def subs(self, subs_dict):
+        """Substitute variables using a dictionary.
+
+        Essentially uses the sympy subs() method where applicable."""
+        new_dict = {}
+        for key, value in self.lht.items():
+            new_dict[key] = value.subs(subs_dict)
+        self.lht = new_dict
+
+        new_dict = {}
+        for key, value in self.rht.items():
+            new_dict[key] = value.subs(subs_dict)
+        self.rht = new_dict
+
+        new_dict = {}
+        for key, value in self.eqs.items():
+            new_dict[key] = value.subs(subs_dict)
+        self.eqs = new_dict
+
+        new_dict = {}
+        for key, value in self.solutions.items():
+            new_dict[key] = value.subs(subs_dict)
+        self.solutions = new_dict
+
     def show(self, show_all=False):
         """Show the whole equation set.
 
@@ -305,8 +333,41 @@ class Equations:
             self.show()
 
 
-def linearize(f, x=None, x_0=0, local_model=False):
-    """Linearize a symbolic expression.
+def linearize(f, x, x_0, local_model=False):
+    """Linearize one or more symbolic expressions
+
+    Args
+    ----
+    f
+        A nonlinear symbolic expression or a list of them.
+    x
+        The variable to linearize for.
+    x_0
+        The linearization point. Must be the same size as x.
+    local_model : optional
+        If True, return the local model Δy = mΔx
+
+    Returns
+    -------
+    A symbolic expression.
+    """
+
+    # Check if this refers to a single function or multiple.
+    if isinstance(f, collections.abc.Iterable):
+        ans = []
+        for fun in f:
+            ans.append(linearize(fun, x, x_0))
+        return ans
+    else:
+        # Check if the linearization is on one or many variables.
+        if isinstance(x, collections.abc.Iterable):
+            return _linearize_expression(f, x, x_0, local_model=local_model)
+        else:
+            return _linearize_univariable(f, x, x_0, local_model=local_model)
+
+
+def _linearize_univariable(f, x, x_0, local_model=False):
+    """Linearize a symbolic expression of one variable.
 
     Args
     ----
@@ -331,6 +392,39 @@ def linearize(f, x=None, x_0=0, local_model=False):
         # Replace with the local difference variable.
         res = res.subs(x, x + x_0) - f.subs(x, x_0)
     return res
+
+
+def _linearize_expression(f, x, x_0, local_model=False):
+    """Linearize a multivariate symbolic expression.
+
+    Args
+    ----
+    f
+        A nonlinear symbolic expression.
+    x
+        A list of variables.
+    x_0
+        The linearization point.
+    local_model : optional
+        If True, return the local model Δy = mΔx
+
+    Returns
+    -------
+    A symbolic expression.
+
+    Employes partial derivatives, in contrast to _linearize_univariable(),
+    which calls on sp.series().
+    """
+    ans = sp.Integer(0)
+    subs_dict = dict(zip(x, x_0))
+    for var, var_0 in subs_dict.items():
+        if not local_model:
+            ans = ans + f.diff(var).subs(subs_dict) * (var - var_0)
+        else:
+            ans = ans + f.diff(var).subs(subs_dict) * var
+    if not local_model:
+        ans = ans + f.subs(subs_dict)
+    return ans
 
 
 def tf(num, den, var):
@@ -422,7 +516,7 @@ def build_initial_conditions(f_time, order=5):
     -------
     A dictionary with keys the items of f_time and values the list order*[0].
     """
-    return {f.func: order * [0] for f in f_time}
+    return {f: order * [0] for f in f_time}
 
 
 def build_correspondence(f_time, f_freq):

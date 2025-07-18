@@ -21,7 +21,7 @@ def test_linearization():
     x = sp.symbols("x")
     f_ = x**2
     f_lin_ = pbg.common.linearize(f_, x, x_0=2)
-    f_lin_exp_ = 4 * x - 4
+    f_lin_exp_ = 4 * (x - 2) + f_.subs(x, 2)
     assert f_lin_ - f_lin_exp_ == 0
 
 
@@ -30,8 +30,22 @@ def test_linearization_2():
     x, c = sp.symbols("x c")
     f_ = c * sp.ln(x)
     f_lin_ = pbg.common.linearize(f_, x, x_0=2, local_model=True)
-    f_lin_exp_ = c / 2 * x
+    f_lin_exp_ = c / 2 * (x)
     assert f_lin_ - f_lin_exp_ == 0
+
+
+def test_linearization_3():
+    """Test a vector, multivariate function."""
+    x, y = sp.symbols("x y")
+    f1_ = x**2 + y**2
+    f2_ = x * y
+    f_ = [f1_, f2_]
+    variables = [x, y]
+    init_conds = [1, 1]
+    f_lin_ = pbg.common.linearize(f_, variables, init_conds)
+    assert len(f_lin_) == 2
+    assert f_lin_[0] - (2 * x + 2 * y - 2) == 0
+    assert f_lin_[1] - (x + y - 1) == 0
 
 
 def test_laplace():
