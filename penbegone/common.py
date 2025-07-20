@@ -15,6 +15,9 @@ from sympy.physics.control import lti
 # Use `display` to print symbols
 
 
+DISPLAY_PRECISION = 3
+
+
 class NoSolutionError(RuntimeError):
     def __init__(self):
         super().__init__("Could not find a solution.")
@@ -69,11 +72,11 @@ def find_functions(expr, arg=None, pure=True):
 def printeq(lht, rht):
     """Print the two parts of an equation in the jupyter output."""
     try:
-        ip.display.display(sp.Eq(lht, rht, evaluate=False))
+        ip.display.display(sp.Eq(lht.evalf(DISPLAY_PRECISION), rht.evalf(DISPLAY_PRECISION), evaluate=False))
     except BaseException:
-        ip.display.display(lht)
+        ip.display.display(lht.evalf(DISPLAY_PRECISION))
         print("=")
-        ip.display.display(rht)
+        ip.display.display(rht.evalf(DISPLAY_PRECISION))
 
 
 def printsols(sols):
@@ -117,12 +120,12 @@ class Equations:
         """Tell how many equations are contained."""
         return len(self.eqs) + len(self.solutions)
 
-    def add(self, left, right):
+    def add(self, left, right, display=True):
         """Add an equation to the system."""
         # Add an equation to the list
-        self._add(left, right)
+        self._add(left, right, display=display)
 
-    def _add(self, left, right, silent=False):
+    def _add(self, left, right, silent=False, display=True):
         if silent:
             key = "temp"
         else:
@@ -131,6 +134,8 @@ class Equations:
         self.lht[key] = left
         self.rht[key] = right
         self.eqs[key] = -left + right
+        if not display:
+            self.solutions_updated[key] = False
 
     def rearrange(self, key, variable, display=True, inplace=False):
         """Rearrange an equation for a variable.
@@ -215,10 +220,10 @@ class Equations:
         elif display:
             self.show()
 
-    def apply(self, variable, expression):
+    def apply(self, variable, expression, display=False):
         """Equivalent of adding an equation and calling use_eq on it."""
         self._add(variable, expression, silent=True)
-        self.use_eq("temp", variable)
+        self.use_eq("temp", variable, display=display)
 
     def apply_solutions(self, key, display=True):
         """Forcefully apply the solutions onto an equation."""
@@ -272,19 +277,22 @@ class Equations:
             show_all: Show all the equations of the set.
         """
         # First show the solutions so far.
-        variables = self.solutions_updated.keys()
-        for var in variables:
-            if self.solutions_updated[var] or show_all:
-                string = ip.display.Markdown(f"${sp.printing.latex(var)}$ = ${sp.printing.latex(self.solutions[var])}$")
-                ip.display.display(string)
-                self.solutions_updated[var] = False
+        if len(self.solutions) > 0:
+            variables = self.solutions_updated.keys()
+            for var in variables:
+                if self.solutions_updated[var] or show_all:
+                    string = ip.display.Markdown(
+                        f"${sp.printing.latex(var)}$ = ${sp.printing.latex(self.solutions[var])}$"
+                    )
+                    ip.display.display(string)
+                    self.solutions_updated[var] = False
 
         # Next show the equations.
         sorted_keys = sorted(self.eqs.keys())
         for key in sorted_keys:
             if key > self._last_shown or show_all:
                 string = ip.display.Markdown(
-                    f"[{key}]: ${sp.printing.latex(self.lht[key])}$ = ${sp.printing.latex(self.rht[key])}$"
+                    f"[{key}]: ${sp.printing.latex(self.lht[key].evalf(DISPLAY_PRECISION))}$ = ${sp.printing.latex(self.rht[key].evalf(DISPLAY_PRECISION))}$"
                 )
                 ip.display.display(string)
 
