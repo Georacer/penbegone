@@ -424,7 +424,7 @@ def _linearize_expression(f, x, x_0, local_model=False):
     which calls on sp.series().
     """
     ans = sp.Integer(0)
-    subs_dict = dict(zip(x, x_0))
+    subs_dict = dict(zip(x, x_0, strict=True))
     for var, var_0 in subs_dict.items():
         if not local_model:
             ans = ans + f.diff(var).subs(subs_dict) * (var - var_0)
@@ -538,7 +538,7 @@ def build_correspondence(f_time, f_freq):
         The corresponding functions in the frequency domain.
     """
 
-    return {t.func: f.func for t, f in zip(f_time, f_freq)}
+    return {t.func: f.func for t, f in zip(f_time, f_freq, strict=True)}
 
 
 def _upper(symbol):
