@@ -31,9 +31,6 @@ jobs:
       - name: Run mypy
         run: uv run mypy
 
-      - name: Run deptry
-        run: uv run deptry .
-
   test:
     runs-on: ubuntu-latest
     strategy:

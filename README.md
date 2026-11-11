@@ -45,5 +45,4 @@ eqs.show()
 | Run the tests with coverage    | `uv run pytest --cov`                    |
 | Run ruff and the other hooks   | `uv run pre-commit run -a`               |
 | Run the type checker           | `uv run mypy`                            |
-| Find dependency problems       | `uv run deptry .`                        |
 | Test on another Python version | `uv run --isolated --python 3.10 pytest` |
