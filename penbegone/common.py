@@ -487,9 +487,9 @@ def laplace(expr, t, s, correspondence=None, init_conds=None):
     expr
         The expression.
     t : sp.Symbol
-        The frequency-domain variable.
+        The time-domain variable.
     s : sp.Symbol
-        The time-domain variable
+        The frequency-domain variable.
     correspondence : dict, optional
         A dictionary to assign time-domain function f to frequency-domain function F.
         Required when there are functions in expr.
