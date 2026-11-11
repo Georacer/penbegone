@@ -9,7 +9,6 @@ dist/
 
 # Unit test / coverage reports
 htmlcov/
-.tox/
 .coverage
 .coverage.*
 coverage.xml
@@ -21,7 +20,6 @@ coverage.xml
 # Environments
 .env
 .venv
-.python-version
 
 # Tool caches
 .mypy_cache/

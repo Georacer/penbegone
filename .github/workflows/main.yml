@@ -34,21 +34,20 @@ jobs:
       - name: Run deptry
         run: uv run deptry .
 
-  tox:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
     steps:
       - name: Check out
         uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10
+      - name: Set up the environment
+        uses: ./.github/actions/setup-uv-env
         with:
           python-version: ${{ matrix.python-version }}
-          enable-cache: true
 
-      - name: Test with tox
-        run: uvx --with tox-uv --with tox-gh-actions tox
+      - name: Run the tests
+        run: uv run pytest --cov
