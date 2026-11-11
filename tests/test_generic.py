@@ -48,6 +48,16 @@ def test_linearization_3():
     assert f_lin_[1] - (x + y - 1) == 0
 
 
+def test_linearization_4():
+    """Test a vector, multivariate function into a local model."""
+    x, y = sp.symbols("x y")
+    f_ = [x**2 + y**2, x * y]
+    f_lin_ = pbg.common.linearize(f_, [x, y], [1, 1], local_model=True)
+    assert len(f_lin_) == 2
+    assert f_lin_[0] - (2 * x + 2 * y) == 0
+    assert f_lin_[1] - (x + y) == 0
+
+
 def test_laplace():
     """Test the Laplace transform."""
     s, t, a = sp.symbols("s t a")

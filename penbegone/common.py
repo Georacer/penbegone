@@ -364,7 +364,7 @@ def linearize(f, x, x_0, local_model=False):
     if isinstance(f, collections.abc.Iterable):
         ans = []
         for fun in f:
-            ans.append(linearize(fun, x, x_0))
+            ans.append(linearize(fun, x, x_0, local_model=local_model))
         return ans
     else:
         # Check if the linearization is on one or many variables.
