@@ -6,15 +6,14 @@ on:
     branches: [main]
 
 jobs:
-  
   publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up the environment
-        uses: ./.github/actions/setup-poetry-env
+        uses: ./.github/actions/setup-uv-env
 
       - name: Export tag
         id: vars
@@ -22,23 +21,21 @@ jobs:
 
       - name: Build and publish
         run: |
-          source .venv/bin/activate
-          poetry version $RELEASE_VERSION
+          uv version $RELEASE_VERSION
           make build-and-publish
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
           RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
-  
+
   deploy-docs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up the environment
-        uses: ./.github/actions/setup-poetry-env
+        uses: ./.github/actions/setup-uv-env
 
       - name: Deploy documentation
-        run: poetry run mkdocs gh-deploy --force
-  
+        run: uv run mkdocs gh-deploy --force
