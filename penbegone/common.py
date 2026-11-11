@@ -495,7 +495,7 @@ def laplace(expr, t, s, correspondence=None, init_conds=None):
         Required when there are functions in expr.
 
     """
-    # Calculate the inverse laplace transform.
+    # Calculate the Laplace transform.
     expr_s_ = sp.laplace_transform(expr, t, s, noconds=True)
     # Find the functions of t.
     funcs_t = find_functions(expr_s_, t)
